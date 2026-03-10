@@ -1,0 +1,15 @@
+# Copyright (c) 2006-2026 afri & veit
+# SPDX-License-Identifier: Apache-2.0
+
+# Rust / Cargo
+/target/
+Cargo.lock
+
+# Original Drupal archive — large, reference-only
+/cache/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
