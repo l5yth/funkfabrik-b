@@ -10,5 +10,5 @@ edition = "2024"
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 tera = "1"
-tower-http = { version = "0.5", features = ["fs"] }
+tower-http = { version = "0.6", features = ["fs"] }
 serde_json = "1"
