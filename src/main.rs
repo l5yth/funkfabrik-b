@@ -261,8 +261,8 @@ mod tests {
     /// Build an app with explicit external URL overrides.
     fn test_app_with_urls(weather_url: &str, rss_url: &str) -> Router {
         let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-        let pattern  = format!("{}/templates/**/*.html", manifest);
-        let tera     = Tera::new(&pattern).expect("failed to parse templates");
+        let pattern = format!("{}/templates/**/*.html", manifest);
+        let tera = Tera::new(&pattern).expect("failed to parse templates");
         build_router(AppState {
             tera: Arc::new(tera),
             http: reqwest::Client::new(),
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn page_title_unknown_returns_fallback() {
         assert_eq!(page_title_for("000"), "???");
-        assert_eq!(page_title_for(""),    "???");
+        assert_eq!(page_title_for(""), "???");
         assert_eq!(page_title_for("abc"), "???");
     }
 
@@ -385,7 +385,11 @@ mod tests {
     async fn known_page_returns_200() {
         for (num, _) in PAGES {
             let resp = test_app()
-                .oneshot(Request::get(format!("/{}", num)).body(Body::empty()).unwrap())
+                .oneshot(
+                    Request::get(format!("/{}", num))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
                 .await
                 .unwrap();
             assert_eq!(resp.status(), StatusCode::OK, "page {num} should be 200");
@@ -462,7 +466,11 @@ mod tests {
     #[tokio::test]
     async fn static_files_are_served() {
         let resp = test_app()
-            .oneshot(Request::get("/static/teletext.js").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::get("/static/teletext.js")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
