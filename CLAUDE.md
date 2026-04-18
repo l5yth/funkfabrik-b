@@ -197,6 +197,51 @@ Add a new page:
 
 ---
 
+## Engineering standards
+
+These apply to all code in this repo and match the cross-project conventions
+shared across the author's projects.
+
+### Quality gates
+
+| Standard | Target | Notes |
+|----------|--------|-------|
+| Test coverage | 100 % | Every public function and route must have at least one test; use `cargo-tarpaulin` or `llvm-cov` |
+| Documentation | 100 % | Every public item must have a `///` doc comment; `#![deny(missing_docs)]` in `lib.rs` / `main.rs` |
+| File size | < 500 LOC | Split into modules when a file approaches 500 lines |
+| Linting | zero warnings | `#![deny(warnings)]`; run `cargo clippy -- -D warnings` in CI |
+
+### CI (`.github/workflows/`)
+
+Every PR must pass:
+1. `cargo fmt --check` — formatting
+2. `cargo clippy -- -D warnings` — lints
+3. `cargo test` — unit + integration tests
+4. Coverage report uploaded to Codecov (action already present)
+5. `cargo doc --no-deps` — docs must build cleanly
+
+### Modularity
+
+- Keep `src/main.rs` to startup wiring only; extract domain logic into `src/`
+  sub-modules (e.g. `routes.rs`, `state.rs`, `pages.rs`) before any file
+  exceeds 500 lines.
+- Each module gets its own `#[cfg(test)] mod tests { … }` block.
+
+### README
+
+`README.md` must cover:
+- One-line description
+- Prerequisites (`rustup`, stable toolchain)
+- `cargo run` quick-start
+- Environment variables / config
+- Link to live site
+
+### Commit style
+
+Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`).
+
+---
+
 ## License & copyright
 
 Copyright (c) 2006-2026 afri & veit.

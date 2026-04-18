@@ -22,7 +22,7 @@
     <ul>
       {% for page in pages %}
       <li{% if page.num == current_page %} class="active"{% endif %}>
-        <a href="/{{ page.num }}" title="{{ page.title }}">{{ page.num }}</a>
+        <a href="/{{ page.num }}" title="{{ page.title }}">{%- if page.blink -%}<span class="blink">{{ page.num }}</span>{%- else -%}{{ page.num }}{%- endif -%}</a>
       </li>
       {% endfor %}
     </ul>

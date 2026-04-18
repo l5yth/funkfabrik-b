@@ -64,7 +64,7 @@
   let digits = '';
   let timer = null;
 
-  const KNOWN_PAGES = ['100', '101', '170', '300', '666', '777', '999'];
+  const KNOWN_PAGES = ['100', '101', '170', '300', '404', '666', '777', '999'];
 
   function render() {
     // Show typed digits + underscores for remaining slots

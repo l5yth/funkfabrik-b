@@ -135,6 +135,9 @@ body {
   position: relative;
   will-change: transform;
   transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  /* Pad the bottom so the last line is not hidden behind #viewport's
+     padding-bottom when scrolled to the maximum offset. */
+  padding-bottom: 16px;
 }
 
 /* ── Typography ── */
