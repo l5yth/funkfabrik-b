@@ -35,6 +35,8 @@
   const viewport = document.getElementById('viewport');
   const scroller = document.getElementById('content-scroll');
   if (!viewport || !scroller) return;
+  // Games capture arrow keys themselves; yield to them entirely.
+  if (document.getElementById('game-canvas')) return;
 
   let offset = 0;
   const STEP = 300; // pixels per keypress

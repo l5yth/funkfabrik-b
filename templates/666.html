@@ -5,21 +5,44 @@
 {% block content %}
 <h1>Kontakt</h1>
 
-<h2>Schreib uns</h2>
+{% if entries %}
+<h2>Gästebuch</h2>
+{% for e in entries %}
+<p class="color-cyan">{{ e.date }}</p>
+<p><span class="color-yellow">{{ e.name }}</span> schreibt:</p>
+<p>{{ e.message }}</p>
+{% if not loop.last %}<hr>{% endif %}
+{% endfor %}
+<hr>
+{% endif %}
+
+{% if flash_success %}<p class="color-green">■ Eintrag gespeichert!</p>{% endif %}
+{% if flash_error == "captcha" %}<p class="color-red">■ Falsches Lösungswort.</p>{% endif %}
+{% if flash_error == "empty" %}<p class="color-red">■ Nachricht darf nicht leer sein.</p>{% endif %}
+{% if flash_error == "url" %}<p class="color-red">■ Verboten in Deutschland!</p>{% endif %}
+
+<h2>Ins Gästebuch eintragen</h2>
 
 <form method="post" action="/666/send">
-  <label for="name">Name</label>
+  <label for="name">Name (optional)</label>
   <input type="text" id="name" name="name" placeholder="Dein Name" autocomplete="off">
-
-  <label for="email">E-Mail</label>
-  <input type="email" id="email" name="email" placeholder="deine@mail.de" autocomplete="off">
 
   <label for="msg">Nachricht</label>
   <textarea id="msg" name="message" rows="5" placeholder="Deine Nachricht..."></textarea>
 
-  <input type="submit" value="ABSENDEN">
+  <label for="captcha">Was ist der erste Buchstabe im Funkfabrik Alphabet?</label>
+  <input type="text" id="captcha" name="captcha" autocomplete="off" maxlength="1">
+
+  <input type="submit" value="EINTRAGEN">
 </form>
 
 <hr>
 <p class="color-cyan">Oder per Mail: <span class="color-white">hallo@funkfabrik-b.de</span></p>
+
+<h2>Wo wir noch sind</h2>
+<ul>
+  <li>Elektronische Nachrichten: info&#9280;funkfabrik-b.de</li>
+  <li>Pixelfed: <a href="https://punk.photos/funkfabrikb" target="_blank" rel="noopener">punk.photos/funkfabrikb</a></li>
+  <li>Peertube: <a href="https://punktube.net/a/funkfabrikb/video-channels" target="_blank" rel="noopener">punktube.net/funkfabrikb</a></li>
+</ul>
 {% endblock %}

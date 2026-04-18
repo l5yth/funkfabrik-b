@@ -888,6 +888,39 @@ mod tests {
 
     // ── Guestbook integration tests ───────────────────────────────────────
 
+    // ── Game sub-page tests ───────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn game_pages_return_200_with_canvas() {
+        for game in ["tetris", "invaders", "snake"] {
+            let resp = test_app()
+                .oneshot(
+                    Request::get(format!("/777/{}", game))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), StatusCode::OK, "game {game} should be 200");
+            let body = body_string(resp.into_body()).await;
+            assert!(
+                body.contains("game-canvas"),
+                "game {game} should contain canvas element"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn unknown_game_returns_not_found_content() {
+        let resp = test_app()
+            .oneshot(Request::get("/777/pong").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_string(resp.into_body()).await;
+        assert!(body.contains("nicht gefunden") || body.contains("PAGE NOT FOUND"));
+    }
+
     fn post_form(path: &str, body: &str) -> Request<Body> {
         Request::post(path)
             .header("Content-Type", "application/x-www-form-urlencoded")
