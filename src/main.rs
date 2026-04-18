@@ -42,14 +42,14 @@ use tower_http::services::ServeDir;
 /// (`100.html`).  `blink` causes the number to flash in the nav bar — used
 /// to highlight special or time-limited pages.
 const PAGES: &[(&str, &str, bool)] = &[
-    ("100", "Startseite",      false),
-    ("101", "Radio hören",     false),
-    ("170", "Wettermagazin",   false),
+    ("100", "Startseite", false),
+    ("101", "Radio hören", false),
+    ("170", "Wettermagazin", false),
     ("300", "20 Jahre Brutto", true),
-    ("404", "Fanseite",        false),
-    ("666", "Kontakt",         false),
-    ("777", "Spiele",          false),
-    ("999", "Impressum",       false),
+    ("404", "Fanseite", false),
+    ("666", "Kontakt", false),
+    ("777", "Spiele", false),
+    ("999", "Impressum", false),
 ];
 
 /// Cached weather data fetched from wttr.in.
@@ -442,7 +442,11 @@ async fn guestbook_post(
         .unwrap_or_default()
         .as_secs();
 
-    let entry = GuestEntry { name, message, timestamp_secs: now_secs };
+    let entry = GuestEntry {
+        name,
+        message,
+        timestamp_secs: now_secs,
+    };
 
     {
         let mut gb = state.guestbook.lock().unwrap();
@@ -502,11 +506,7 @@ mod tests {
     }
 
     /// Build an app with full control over all external dependencies.
-    fn test_app_full(
-        weather_url: &str,
-        rss_url: &str,
-        gb_path: std::path::PathBuf,
-    ) -> Router {
+    fn test_app_full(weather_url: &str, rss_url: &str, gb_path: std::path::PathBuf) -> Router {
         let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let pattern = format!("{}/templates/**/*.html", manifest);
         let tera = Tera::new(&pattern).expect("failed to parse templates");
@@ -649,7 +649,9 @@ mod tests {
 
     #[test]
     fn looks_like_weather_rejects_quota_message() {
-        assert!(!looks_like_weather("Sorry, we are out of quota for your IP."));
+        assert!(!looks_like_weather(
+            "Sorry, we are out of quota for your IP."
+        ));
         assert!(!looks_like_weather(""));
         assert!(!looks_like_weather("<html><body>Error</body></html>"));
     }
@@ -657,7 +659,10 @@ mod tests {
     #[test]
     fn generate_current_weather_contains_degree() {
         let w = generate_current_weather(12345678);
-        assert!(looks_like_weather(&w), "generated weather should pass looks_like_weather: {w}");
+        assert!(
+            looks_like_weather(&w),
+            "generated weather should pass looks_like_weather: {w}"
+        );
     }
 
     #[test]
@@ -708,7 +713,10 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_string(resp.into_body()).await;
-        assert!(body.contains("°C") || body.contains("°F"), "fallback should contain a temperature");
+        assert!(
+            body.contains("°C") || body.contains("°F"),
+            "fallback should contain a temperature"
+        );
         assert!(body.contains("Vorhersage"));
     }
 
@@ -748,8 +756,14 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_string(resp.into_body()).await;
-        assert!(body.contains("°C") || body.contains("°F"), "should fall back to generated weather");
-        assert!(!body.contains("quota"), "quota error message should not appear in output");
+        assert!(
+            body.contains("°C") || body.contains("°F"),
+            "should fall back to generated weather"
+        );
+        assert!(
+            !body.contains("quota"),
+            "quota error message should not appear in output"
+        );
     }
 
     #[tokio::test]
@@ -1013,7 +1027,11 @@ mod tests {
     #[tokio::test]
     async fn guestbook_entry_appears_after_post() {
         let gb_path = temp_guestbook_path();
-        let app = test_app_full("http://127.0.0.1:1/weather", "http://127.0.0.1:1/rss", gb_path.clone());
+        let app = test_app_full(
+            "http://127.0.0.1:1/weather",
+            "http://127.0.0.1:1/rss",
+            gb_path.clone(),
+        );
 
         // Submit an entry.
         let post_resp = app

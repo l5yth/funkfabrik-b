@@ -111,7 +111,11 @@ mod tests {
     #[test]
     fn format_output_is_always_16_chars() {
         for secs in [0u64, 86400, 1_000_000_000, 1_700_000_000] {
-            assert_eq!(format_timestamp(secs).len(), 16, "bad length for secs={secs}");
+            assert_eq!(
+                format_timestamp(secs).len(),
+                16,
+                "bad length for secs={secs}"
+            );
         }
     }
 
