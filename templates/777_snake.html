@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block page_title %}SNAKE{% endblock %}
+
+{% block content %}
+<p><a href="/777">← Spielhalle</a></p>
+<canvas id="game-canvas" width="360" height="396"
+        style="display:block;background:#000;border:2px solid #0402FC;margin-top:8px"></canvas>
+<p id="game-status" class="color-cyan" style="margin-top:4px">Pfeiltasten · R neu starten</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+'use strict';
+(function () {
+  var C = document.getElementById('game-canvas');
+  var ctx = C.getContext('2d');
+
+  var SZ = 18;            // cell size
+  var COLS = 20, ROWS = 18;
+  var TOP = 36;           // score bar height
+
+  var snake, dir, nextDir, food, score, highScore, lost, tickMs, lastTick, animId, foodCount;
+
+  highScore = parseInt(sessionStorage.getItem('snake_hs') || '0', 10);
+
+  function rnd(n) { return Math.floor(Math.random() * n); }
+
+  function spawnFood() {
+    var occupied = {};
+    snake.forEach(function (s) { occupied[s.x + ',' + s.y] = true; });
+    var candidates = [];
+    for (var x = 0; x < COLS; x++)
+      for (var y = 0; y < ROWS; y++)
+        if (!occupied[x + ',' + y]) candidates.push({x: x, y: y});
+    food = candidates[rnd(candidates.length)];
+  }
+
+  function init() {
+    var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+    snake = [{x: cx, y: cy}, {x: cx - 1, y: cy}, {x: cx - 2, y: cy}];
+    dir = {x: 1, y: 0};
+    nextDir = {x: 1, y: 0};
+    score = 0; lost = false; tickMs = 150; lastTick = 0; foodCount = 0;
+    spawnFood();
+    if (animId) cancelAnimationFrame(animId);
+    animId = requestAnimationFrame(loop);
+  }
+
+  function tick() {
+    dir = nextDir;
+    var head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    // Wall collision
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) { lost = true; return; }
+
+    // Self collision
+    for (var i = 0; i < snake.length; i++) {
+      if (snake[i].x === head.x && snake[i].y === head.y) { lost = true; return; }
+    }
+
+    snake.unshift(head);
+
+    if (head.x === food.x && head.y === food.y) {
+      score += 10;
+      foodCount++;
+      if (score > highScore) { highScore = score; sessionStorage.setItem('snake_hs', highScore); }
+      // Speed up every 5 food
+      if (foodCount % 5 === 0) tickMs = Math.max(60, tickMs - 10);
+      spawnFood();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, C.width, C.height);
+
+    // Score bar
+    ctx.fillStyle = '#0402FC';
+    ctx.fillRect(0, 0, C.width, TOP);
+    ctx.fillStyle = '#04FEFC';
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillText('PUNKTE ' + score, 8, 18);
+    ctx.fillStyle = '#FCFE04';
+    ctx.fillText('BEST ' + highScore, 8, 32);
+
+    // Grid (subtle)
+    ctx.strokeStyle = '#0a0a0a';
+    ctx.lineWidth = 1;
+    for (var x = 0; x <= COLS; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * SZ, TOP);
+      ctx.lineTo(x * SZ, TOP + ROWS * SZ);
+      ctx.stroke();
+    }
+    for (var y = 0; y <= ROWS; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, TOP + y * SZ);
+      ctx.lineTo(COLS * SZ, TOP + y * SZ);
+      ctx.stroke();
+    }
+
+    // Snake body
+    for (var i = 1; i < snake.length; i++) {
+      ctx.fillStyle = '#04FE04';
+      ctx.fillRect(snake[i].x * SZ + 1, TOP + snake[i].y * SZ + 1, SZ - 2, SZ - 2);
+    }
+    // Snake head (brighter)
+    if (snake.length) {
+      ctx.fillStyle = '#FCFE04';
+      ctx.fillRect(snake[0].x * SZ + 1, TOP + snake[0].y * SZ + 1, SZ - 2, SZ - 2);
+      // eyes
+      ctx.fillStyle = '#000';
+      var ex = snake[0].x * SZ, ey = TOP + snake[0].y * SZ;
+      ctx.fillRect(ex + 4, ey + 4, 3, 3);
+      ctx.fillRect(ex + SZ - 7, ey + 4, 3, 3);
+    }
+
+    // Food
+    ctx.fillStyle = '#FC0204';
+    ctx.fillRect(food.x * SZ + 2, TOP + food.y * SZ + 2, SZ - 4, SZ - 4);
+
+    if (lost) {
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, TOP + ROWS * SZ / 2 - 30, C.width, 60);
+      ctx.fillStyle = '#FC0204';
+      ctx.font = 'bold 18px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', C.width / 2, TOP + ROWS * SZ / 2 - 6);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '13px "Courier New", monospace';
+      ctx.fillText('R zum Neustart', C.width / 2, TOP + ROWS * SZ / 2 + 14);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  function loop(ts) {
+    if (!lost) {
+      if (ts - lastTick >= tickMs) {
+        lastTick = ts;
+        tick();
+      }
+    }
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('keydown', function (e) {
+    switch (e.key) {
+      case 'ArrowUp':    if (dir.y === 0) nextDir = {x: 0, y: -1}; e.preventDefault(); break;
+      case 'ArrowDown':  if (dir.y === 0) nextDir = {x: 0, y:  1}; e.preventDefault(); break;
+      case 'ArrowLeft':  if (dir.x === 0) nextDir = {x: -1, y: 0}; e.preventDefault(); break;
+      case 'ArrowRight': if (dir.x === 0) nextDir = {x:  1, y: 0}; e.preventDefault(); break;
+      case 'r': case 'R': init(); break;
+    }
+  });
+
+  init();
+})();
+</script>
+{% endblock %}

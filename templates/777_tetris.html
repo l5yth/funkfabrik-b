@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block page_title %}TETRIS{% endblock %}
+
+{% block content %}
+<p><a href="/777">← Spielhalle</a></p>
+<canvas id="game-canvas" width="220" height="440"
+        style="display:block;background:#000;border:2px solid #0402FC;margin-top:8px"></canvas>
+<p id="game-status" class="color-yellow" style="margin-top:4px">← → bewegen · ↑ drehen · ↓ fallen · Leertaste drop · P pause · R neu</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+'use strict';
+(function () {
+  var C = document.getElementById('game-canvas');
+  var ctx = C.getContext('2d');
+
+  var COLS = 10, ROWS = 20, SZ = 20, TOP = 40;
+  // Teletext palette
+  var COLORS = ['#000000','#04FEFC','#FCFE04','#FC0204','#04FE04','#FC0204','#FFFFFF','#FCFE04'];
+  // I O T S Z J L
+  var PIECES = [
+    [[1,1,1,1]],
+    [[2,2],[2,2]],
+    [[0,3,0],[3,3,3]],
+    [[0,4,4],[4,4,0]],
+    [[5,5,0],[0,5,5]],
+    [[6,0,0],[6,6,6]],
+    [[0,0,7],[7,7,7]]
+  ];
+
+  var board, piece, px, py, score, lines, level, lost, paused, dropTimer, lastTime, animId;
+
+  function newBoard() {
+    board = [];
+    for (var r = 0; r < ROWS; r++) { board.push(new Array(COLS).fill(0)); }
+  }
+
+  function rotate(m) {
+    var R = m.length, C2 = m[0].length, out = [];
+    for (var c = 0; c < C2; c++) {
+      out.push([]);
+      for (var r = R - 1; r >= 0; r--) out[c].push(m[r][c]);
+    }
+    return out;
+  }
+
+  function fits(p, x, y) {
+    for (var r = 0; r < p.length; r++)
+      for (var c = 0; c < p[r].length; c++)
+        if (p[r][c]) {
+          var nx = x + c, ny = y + r;
+          if (nx < 0 || nx >= COLS || ny >= ROWS) return false;
+          if (ny >= 0 && board[ny][nx]) return false;
+        }
+    return true;
+  }
+
+  function spawn() {
+    piece = PIECES[Math.floor(Math.random() * PIECES.length)];
+    px = Math.floor((COLS - piece[0].length) / 2);
+    py = -piece.length + 1;
+    if (!fits(piece, px, py + 1) && !fits(piece, px, py)) { lost = true; draw(); }
+  }
+
+  function lock() {
+    for (var r = 0; r < piece.length; r++)
+      for (var c = 0; c < piece[r].length; c++)
+        if (piece[r][c] && py + r >= 0) board[py + r][px + c] = piece[r][c];
+    clearLines();
+    spawn();
+  }
+
+  function clearLines() {
+    var cleared = 0;
+    for (var r = ROWS - 1; r >= 0; ) {
+      if (board[r].every(function (v) { return v !== 0; })) {
+        board.splice(r, 1);
+        board.unshift(new Array(COLS).fill(0));
+        cleared++;
+      } else { r--; }
+    }
+    if (cleared) {
+      var pts = [0, 100, 300, 500, 800][cleared] * (level + 1);
+      score += pts;
+      lines += cleared;
+      level = Math.floor(lines / 10);
+    }
+  }
+
+  function ghostY() {
+    var gy = py;
+    while (fits(piece, px, gy + 1)) gy++;
+    return gy;
+  }
+
+  function drawCell(x, y, color, alpha) {
+    ctx.globalAlpha = alpha || 1;
+    ctx.fillStyle = color;
+    ctx.fillRect(x * SZ, TOP + y * SZ, SZ - 1, SZ - 1);
+    ctx.globalAlpha = 1;
+  }
+
+  function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, C.width, C.height);
+
+    // Score bar
+    ctx.fillStyle = '#0402FC';
+    ctx.fillRect(0, 0, C.width, TOP);
+    ctx.fillStyle = '#FCFE04';
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillText('PTS ' + score, 4, 14);
+    ctx.fillStyle = '#04FEFC';
+    ctx.fillText('LV ' + (level + 1), 4, 30);
+
+    // Grid lines
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1;
+    for (var c = 0; c <= COLS; c++) {
+      ctx.beginPath(); ctx.moveTo(c * SZ, TOP); ctx.lineTo(c * SZ, TOP + ROWS * SZ); ctx.stroke();
+    }
+
+    // Board
+    for (var r = 0; r < ROWS; r++)
+      for (var col = 0; col < COLS; col++)
+        if (board[r][col]) drawCell(col, r, COLORS[board[r][col]]);
+
+    // Ghost
+    if (!lost && piece) {
+      var gy = ghostY();
+      for (var r2 = 0; r2 < piece.length; r2++)
+        for (var c2 = 0; c2 < piece[r2].length; c2++)
+          if (piece[r2][c2]) drawCell(px + c2, gy + r2, COLORS[piece[r2][c2]], 0.25);
+    }
+
+    // Piece
+    if (!lost && piece) {
+      for (var r3 = 0; r3 < piece.length; r3++)
+        for (var c3 = 0; c3 < piece[r3].length; c3++)
+          if (piece[r3][c3] && py + r3 >= 0) drawCell(px + c3, py + r3, COLORS[piece[r3][c3]]);
+    }
+
+    if (lost) {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, TOP + ROWS * SZ / 2 - 30, C.width, 60);
+      ctx.fillStyle = '#FC0204';
+      ctx.font = 'bold 16px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', C.width / 2, TOP + ROWS * SZ / 2 - 8);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '13px "Courier New", monospace';
+      ctx.fillText('R zum Neustart', C.width / 2, TOP + ROWS * SZ / 2 + 12);
+      ctx.textAlign = 'left';
+    }
+
+    if (paused && !lost) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, TOP + ROWS * SZ / 2 - 20, C.width, 40);
+      ctx.fillStyle = '#FCFE04';
+      ctx.font = 'bold 16px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('PAUSE', C.width / 2, TOP + ROWS * SZ / 2 + 6);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  function interval() { return Math.max(80, 600 - level * 50); }
+
+  function loop(ts) {
+    if (!lastTime) lastTime = ts;
+    var dt = ts - lastTime;
+    lastTime = ts;
+    if (!paused && !lost) {
+      dropTimer += dt;
+      if (dropTimer >= interval()) {
+        dropTimer = 0;
+        if (fits(piece, px, py + 1)) { py++; } else { lock(); }
+      }
+    }
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+
+  function init() {
+    newBoard();
+    score = 0; lines = 0; level = 0; lost = false; paused = false; dropTimer = 0; lastTime = 0;
+    if (animId) cancelAnimationFrame(animId);
+    spawn();
+    animId = requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('keydown', function (e) {
+    if (lost) { if (e.key === 'r' || e.key === 'R') init(); return; }
+    switch (e.key) {
+      case 'ArrowLeft':  if (!paused && fits(piece, px - 1, py)) px--; e.preventDefault(); break;
+      case 'ArrowRight': if (!paused && fits(piece, px + 1, py)) px++; e.preventDefault(); break;
+      case 'ArrowDown':  if (!paused && fits(piece, px, py + 1)) { py++; dropTimer = 0; } e.preventDefault(); break;
+      case 'ArrowUp':
+        if (!paused) { var rot = rotate(piece); if (fits(rot, px, py)) piece = rot; }
+        e.preventDefault(); break;
+      case ' ':
+        if (!paused) { while (fits(piece, px, py + 1)) py++; lock(); dropTimer = 0; }
+        e.preventDefault(); break;
+      case 'p': case 'P': paused = !paused; break;
+      case 'r': case 'R': init(); break;
+    }
+  });
+
+  init();
+})();
+</script>
+{% endblock %}

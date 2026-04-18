@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block page_title %}SPACE INVADERS{% endblock %}
+
+{% block content %}
+<p><a href="/777">← Spielhalle</a></p>
+<canvas id="game-canvas" width="560" height="420"
+        style="display:block;background:#000;border:2px solid #0402FC;margin-top:8px"></canvas>
+<p id="game-status" class="color-green" style="margin-top:4px">← → bewegen · Leertaste schießen · R neu starten</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+'use strict';
+(function () {
+  var C = document.getElementById('game-canvas');
+  var ctx = C.getContext('2d');
+
+  var W = C.width, H = C.height;
+  var TOP = 36;          // score bar height
+  var PLAY_H = H - TOP;
+
+  // Invader grid
+  var ROWS_I = 4, COLS_I = 10;
+  var INV_W = 36, INV_H = 24, INV_GAP_X = 14, INV_GAP_Y = 12;
+  var INV_COLORS = ['#FC0204', '#FC0204', '#FCFE04', '#04FE04']; // row colors top→bottom
+
+  // Invader glyphs (drawn as simple box + legs)
+  function drawInvader(x, y, row, frame) {
+    ctx.fillStyle = INV_COLORS[row];
+    // body
+    ctx.fillRect(x + 4, y + 2, INV_W - 8, INV_H - 8);
+    // eyes
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x + 8, y + 6, 5, 5);
+    ctx.fillRect(x + INV_W - 13, y + 6, 5, 5);
+    // legs alternate per frame
+    ctx.fillStyle = INV_COLORS[row];
+    if (frame === 0) {
+      ctx.fillRect(x + 2,  y + INV_H - 6, 5, 6);
+      ctx.fillRect(x + INV_W - 7, y + INV_H - 6, 5, 6);
+    } else {
+      ctx.fillRect(x + 6,  y + INV_H - 6, 5, 6);
+      ctx.fillRect(x + INV_W - 11, y + INV_H - 6, 5, 6);
+    }
+    // antennae
+    ctx.fillRect(x + 4, y, 3, 4);
+    ctx.fillRect(x + INV_W - 7, y, 3, 4);
+  }
+
+  var invaders, px2, playerW, playerH, playerBullet, invBullets;
+  var score, lives, wave, lost, won, animFrame, invDir, invSpeed, invTick, invTickMax;
+  var invDropPending, animFrame2, frame2;
+
+  function initWave() {
+    invaders = [];
+    var startX = 40, startY = TOP + 40;
+    for (var r = 0; r < ROWS_I; r++)
+      for (var c = 0; c < COLS_I; c++)
+        invaders.push({ r: r, c: c, x: startX + c * (INV_W + INV_GAP_X), y: startY + r * (INV_H + INV_GAP_Y), alive: true });
+    invDir = 1;
+    invTickMax = Math.max(200, 600 - wave * 60);
+    invTick = 0;
+    invDropPending = false;
+    frame2 = 0;
+    playerBullet = null;
+    invBullets = [];
+  }
+
+  function init() {
+    px2 = W / 2 - 16;
+    playerW = 32; playerH = 16;
+    score = 0; lives = 3; wave = 0; lost = false; won = false;
+    initWave();
+    if (animFrame) cancelAnimationFrame(animFrame);
+    lastTs = 0;
+    animFrame = requestAnimationFrame(loop2);
+  }
+
+  function aliveInvaders() { return invaders.filter(function (i) { return i.alive; }); }
+
+  function moveInvaders() {
+    frame2 = 1 - frame2;
+    var alive = aliveInvaders();
+    if (!alive.length) { won = true; return; }
+
+    // Check if any invader would hit the edge after moving
+    var hitEdge = false;
+    for (var i = 0; i < alive.length; i++) {
+      var nx = alive[i].x + invDir * 12;
+      if (nx < 2 || nx + INV_W > W - 2) { hitEdge = true; break; }
+    }
+    if (hitEdge) {
+      // Drop down and reverse
+      for (var j = 0; j < invaders.length; j++) {
+        if (invaders[j].alive) invaders[j].y += 16;
+      }
+      invDir = -invDir;
+    } else {
+      for (var k = 0; k < invaders.length; k++) {
+        if (invaders[k].alive) invaders[k].x += invDir * 12;
+      }
+    }
+
+    // Check if any invader reached the player zone
+    for (var m = 0; m < alive.length; m++) {
+      if (alive[m].y + INV_H >= H - playerH - TOP - 10) { lost = true; return; }
+    }
+
+    // Random invader shot
+    var cols = {};
+    for (var n = 0; n < alive.length; n++) cols[alive[n].c] = alive[n];
+    // find bottom-most in each column
+    var shooters = Object.values(cols);
+    if (shooters.length && Math.random() < 0.4) {
+      var sh = shooters[Math.floor(Math.random() * shooters.length)];
+      invBullets.push({ x: sh.x + INV_W / 2 - 2, y: sh.y + INV_H });
+    }
+  }
+
+  function draw2() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    // Score bar
+    ctx.fillStyle = '#0402FC';
+    ctx.fillRect(0, 0, W, TOP);
+    ctx.fillStyle = '#04FE04';
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillText('SCORE ' + score, 8, 18);
+    ctx.fillStyle = '#FC0204';
+    ctx.fillText('WELLE ' + (wave + 1), 8, 32);
+    // Lives
+    ctx.fillStyle = '#FFFFFF';
+    for (var l = 0; l < lives; l++) {
+      ctx.fillText('▲', W - 24 - l * 20, 22);
+    }
+
+    // Invaders
+    for (var i = 0; i < invaders.length; i++) {
+      var inv = invaders[i];
+      if (inv.alive) drawInvader(inv.x, inv.y, inv.r, frame2);
+    }
+
+    // Player
+    ctx.fillStyle = '#FFFFFF';
+    // cannon body
+    ctx.fillRect(px2, H - playerH - 4, playerW, playerH - 6);
+    // barrel
+    ctx.fillRect(px2 + playerW / 2 - 3, H - playerH - 10, 6, 8);
+
+    // Player bullet
+    if (playerBullet) {
+      ctx.fillStyle = '#FCFE04';
+      ctx.fillRect(playerBullet.x, playerBullet.y, 4, 10);
+    }
+
+    // Invader bullets
+    ctx.fillStyle = '#FC0204';
+    for (var b = 0; b < invBullets.length; b++) {
+      ctx.fillRect(invBullets[b].x, invBullets[b].y, 4, 10);
+    }
+
+    if (lost) {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, H / 2 - 30, W, 60);
+      ctx.fillStyle = '#FC0204';
+      ctx.font = 'bold 20px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', W / 2, H / 2 - 4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '14px "Courier New", monospace';
+      ctx.fillText('R zum Neustart', W / 2, H / 2 + 18);
+      ctx.textAlign = 'left';
+    } else if (won) {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, H / 2 - 30, W, 60);
+      ctx.fillStyle = '#04FE04';
+      ctx.font = 'bold 18px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('WELLE GESCHAFFT!', W / 2, H / 2 - 4);
+      ctx.fillStyle = '#FCFE04';
+      ctx.font = '14px "Courier New", monospace';
+      ctx.fillText('Weiter mit R', W / 2, H / 2 + 18);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  var lastTs = 0, keys = {};
+
+  function loop2(ts) {
+    var dt = ts - lastTs;
+    lastTs = ts;
+
+    if (!lost && !won) {
+      // Player movement
+      if (keys['ArrowLeft'])  px2 = Math.max(0, px2 - 4);
+      if (keys['ArrowRight']) px2 = Math.min(W - playerW, px2 + 4);
+
+      // Player bullet movement
+      if (playerBullet) {
+        playerBullet.y -= 8;
+        if (playerBullet.y < TOP) playerBullet = null;
+      }
+
+      // Invader bullet movement
+      for (var b = invBullets.length - 1; b >= 0; b--) {
+        invBullets[b].y += 4;
+        if (invBullets[b].y > H) { invBullets.splice(b, 1); continue; }
+        // Hit player?
+        if (invBullets[b].y + 10 >= H - playerH - 4 &&
+            invBullets[b].x + 4 >= px2 && invBullets[b].x <= px2 + playerW) {
+          invBullets.splice(b, 1);
+          lives--;
+          if (lives <= 0) lost = true;
+        }
+      }
+
+      // Player bullet vs invaders
+      if (playerBullet) {
+        for (var i = 0; i < invaders.length; i++) {
+          var inv = invaders[i];
+          if (!inv.alive) continue;
+          if (playerBullet.x < inv.x + INV_W && playerBullet.x + 4 > inv.x &&
+              playerBullet.y < inv.y + INV_H && playerBullet.y + 10 > inv.y) {
+            inv.alive = false;
+            score += [30, 20, 10, 10][inv.r];
+            playerBullet = null;
+            break;
+          }
+        }
+      }
+
+      // Invader tick
+      invTick += dt;
+      var speed = Math.max(100, invTickMax * (aliveInvaders().length / (ROWS_I * COLS_I)));
+      if (invTick >= speed) {
+        invTick = 0;
+        moveInvaders();
+      }
+    }
+
+    draw2();
+    animFrame = requestAnimationFrame(loop2);
+  }
+
+  window.addEventListener('keydown', function (e) {
+    keys[e.key] = true;
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (won) { wave++; initWave(); won = false; return; }
+      if (lost) return;
+      if (!playerBullet) playerBullet = { x: px2 + playerW / 2 - 2, y: H - playerH - 16 };
+    }
+    if ((e.key === 'r' || e.key === 'R')) { init(); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
+  });
+
+  window.addEventListener('keyup', function (e) { keys[e.key] = false; });
+
+  init();
+})();
+</script>
+{% endblock %}
