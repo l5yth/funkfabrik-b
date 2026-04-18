@@ -1,24 +1,12 @@
 {% extends "base.html" %}
 
-{% block page_title %}SEITE NICHT GEFUNDEN{% endblock %}
+{% block page_title %}FANSEITE{% endblock %}
 
 {% block content %}
-<h1>Fehler</h1>
+<h1>Fanseite</h1>
 
-<h2>Seite {{ current_page }} nicht gefunden</h2>
-
-<p class="color-red blink">■ ■ ■ KEINE VERBINDUNG ■ ■ ■</p>
-
-<p>Die angeforderte Seite existiert nicht.</p>
-
-<h3>Verfügbare Seiten</h3>
-<ul class="page-index">
-  <li><a href="/100"><span class="pg-num">100</span> <span class="pg-title">Startseite</span></a></li>
-  <li><a href="/101"><span class="pg-num">101</span> <span class="pg-title">Radio hören</span></a></li>
-  <li><a href="/170"><span class="pg-num">170</span> <span class="pg-title">Wettermagazin</span></a></li>
-  <li><a href="/300"><span class="pg-num">300</span> <span class="pg-title">Fanseite</span></a></li>
-  <li><a href="/666"><span class="pg-num">666</span> <span class="pg-title">Kontakt</span></a></li>
-  <li><a href="/777"><span class="pg-num">777</span> <span class="pg-title">Spiele</span></a></li>
-  <li><a href="/999"><span class="pg-num">999</span> <span class="pg-title">Impressum</span></a></li>
-</ul>
+<p>Von Fans - für Fans. Das Archiv von 2006 bis gerade eben.</p>
+<p><a href="https://archiv.funkfabrik-b.de/" target="_blank" rel="noopener">https://archiv.funkfabrik-b.de/</a></p>
+<p>Das Archiv lässt sich als Podcast abonnieren — einfach diese URL in eure Podcast-App eintragen:</p>
+<p class="color-cyan">https://archiv.funkfabrik-b.de/rss</p>
 {% endblock %}
