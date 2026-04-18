@@ -4,9 +4,8 @@
 
 {% block content %}
 <p><a href="/777">← Spielhalle</a></p>
-<canvas id="game-canvas" width="220" height="440"
+<canvas id="game-canvas" width="220" height="360"
         style="display:block;background:#000;border:2px solid #0402FC;margin-top:8px"></canvas>
-<p id="game-status" class="color-yellow" style="margin-top:4px">← → bewegen · ↑ drehen · ↓ fallen · Leertaste drop · P pause · R neu</p>
 {% endblock %}
 
 {% block scripts %}
@@ -16,7 +15,7 @@
   var C = document.getElementById('game-canvas');
   var ctx = C.getContext('2d');
 
-  var COLS = 10, ROWS = 20, SZ = 20, TOP = 40;
+  var COLS = 10, ROWS = 20, SZ = 16, TOP = 40;
   // Teletext palette
   var COLORS = ['#000000','#04FEFC','#FCFE04','#FC0204','#04FE04','#FC0204','#FFFFFF','#FCFE04'];
   // I O T S Z J L

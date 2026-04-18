@@ -56,6 +56,22 @@
     if (e.key === 'ArrowDown') { scroll(+STEP); e.preventDefault(); }
     if (e.key === 'ArrowUp')   { scroll(-STEP); e.preventDefault(); }
   });
+
+  // Mouse wheel
+  viewport.addEventListener('wheel', function (e) {
+    scroll(e.deltaY > 0 ? +STEP : -STEP);
+    e.preventDefault();
+  }, { passive: false });
+
+  // Touch swipe
+  let touchStartY = 0;
+  viewport.addEventListener('touchstart', function (e) {
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  viewport.addEventListener('touchend', function (e) {
+    const dy = touchStartY - e.changedTouches[0].clientY;
+    if (Math.abs(dy) > 30) scroll(dy > 0 ? +STEP : -STEP);
+  }, { passive: true });
 })();
 
 /* ── Remote-control digit input ── */

@@ -8,8 +8,7 @@
 {% if entries %}
 <h2>Gästebuch</h2>
 {% for e in entries %}
-<p class="color-cyan">{{ e.date }}</p>
-<p><span class="color-yellow">{{ e.name }}</span> schreibt:</p>
+<p><span class="color-cyan">{{ e.date }}</span> <span class="color-yellow">{{ e.name }}</span> schreibt:</p>
 <p>{{ e.message }}</p>
 {% if not loop.last %}<hr>{% endif %}
 {% endfor %}
