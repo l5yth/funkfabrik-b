@@ -8,6 +8,9 @@ Cargo.lock
 # Original Drupal archive — large, reference-only
 /cache/
 
+# Runtime data
+/data/
+
 # Editor / OS
 .DS_Store
 .idea/
