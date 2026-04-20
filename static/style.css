@@ -43,7 +43,8 @@ body {
 
 /* ── Screen / outer frame ── */
 #screen {
-  width: 960px;
+  width: 100%;
+  max-width: 960px;
   display: flex;
   flex-direction: column;
   border: 20px solid var(--blue);
@@ -94,14 +95,20 @@ body {
 }
 
 #nav ul {
-  list-style: none;
   display: flex;
+  list-style: none;
   gap: 0;
+}
+
+#nav ul li {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 #nav ul li a {
   display: block;
   padding: 2px 10px;
+  text-align: center;
   text-decoration: none;
   font-size: 20px;
 }
@@ -331,4 +338,72 @@ hr {
 
 .page-index li a:hover .pg-title {
   color: var(--yellow);
+}
+
+/* ── Responsive media ── */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+iframe {
+  max-width: 100%;
+}
+
+table {
+  max-width: 100%;
+}
+
+/* ── Mobile overrides ── */
+@media (max-width: 640px) {
+  html, body { overflow: visible; }
+
+  body {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  #screen {
+    border-width: 8px;
+  }
+
+  #header {
+    padding: 3px 8px;
+    gap: 6px;
+  }
+
+  #station-name { font-size: 18px; letter-spacing: 1px; }
+  #page-info    { font-size: 15px; }
+  #clock        { font-size: 16px; }
+
+  #nav {
+    padding: 4px 6px;
+  }
+
+  #nav ul li a {
+    padding: 4px 2px;
+    font-size: 16px;
+  }
+
+  #viewport {
+    height: auto;
+    min-height: 60vh;
+    overflow: visible;
+    padding: 12px 14px;
+  }
+
+  #footer {
+    padding: 3px 8px;
+  }
+
+  #footer-hint, #footer-brand { font-size: 13px; }
+
+  #remote {
+    bottom: 12px;
+    right: 12px;
+    font-size: 28px;
+    padding: 6px 14px;
+    letter-spacing: 6px;
+  }
 }
