@@ -116,8 +116,9 @@ async fn main() {
 
     let app = build_router(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("FUNKFABRIK*B listening on http://0.0.0.0:3000");
+    let addr = std::env::var("FUNKFABRIK_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".into());
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    println!("FUNKFABRIK*B listening on http://{addr}");
     axum::serve(listener, app).await.unwrap();
 }
 
