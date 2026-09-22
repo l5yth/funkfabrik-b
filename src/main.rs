@@ -174,8 +174,11 @@ fn build_router(state: AppState) -> Router {
 ///
 /// Validates `page` against [`PAGES`] before constructing the template name,
 /// so only known page numbers are ever passed to the renderer.  Unknown pages
-/// render `404.html` directly.  Falls back to an inline error string if even
-/// the 404 template fails.
+/// render `not_found.html` directly.  Falls back to an inline error string if
+/// even that template fails.
+///
+/// Note that `404` is a *content* page in [`PAGES`] ("Fanseite"), not the
+/// error page; the error template is `not_found.html` (`SPEC.md` D3).
 ///
 /// # Template context variables
 ///
@@ -808,7 +811,7 @@ mod tests {
     }
 
     /// Path traversal attempts must not reach Tera::render; they should fall
-    /// through to the 404 template.
+    /// through to `not_found.html`.
     #[tokio::test]
     async fn path_traversal_returns_404_template() {
         for path in ["/../../etc/passwd", "/../secret", "/100%2F..%2Fetc"] {
@@ -816,13 +819,14 @@ mod tests {
                 .oneshot(Request::get(path).body(Body::empty()).unwrap())
                 .await
                 .unwrap();
-            // Either the router rejects it (non-200) or our handler serves 404.html.
+            // Either the router rejects it (non-200) or our handler serves
+            // not_found.html (`404` is a content page; see SPEC.md D3).
             let status = resp.status();
             if status == StatusCode::OK {
                 let body = body_string(resp.into_body()).await;
                 assert!(
                     body.contains("nicht gefunden") || body.contains("PAGE NOT FOUND"),
-                    "traversal path {path} should render 404 template, got: {body:.80}"
+                    "traversal path {path} should render not_found.html, got: {body:.80}"
                 );
             }
         }
@@ -1084,6 +1088,111 @@ mod tests {
         assert!(body.contains("Hallo Welt"), "message not in body");
 
         let _ = std::fs::remove_file(&gb_path);
+    }
+
+    // ── SPEC D9: guestbook persistence behaviours ─────────────────────────
+
+    /// SPEC D9 — an entry submitted with an empty name renders as `Anonym`.
+    ///
+    /// The form marks the name field optional, so this is the common path for
+    /// a drive-by post, not an edge case.
+    #[tokio::test]
+    async fn guestbook_empty_name_renders_as_anonym() {
+        let gb_path = temp_guestbook_path();
+        let app = test_app_full(
+            "http://127.0.0.1:1/weather",
+            "http://127.0.0.1:1/rss",
+            gb_path.clone(),
+        );
+
+        let post_resp = app
+            .clone()
+            .oneshot(post_form("/666/send", "name=&message=Ohne+Namen&captcha=B"))
+            .await
+            .unwrap();
+        assert_eq!(post_resp.status(), StatusCode::SEE_OTHER);
+
+        let body = body_string(
+            app.oneshot(Request::get("/666").body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .into_body(),
+        )
+        .await;
+
+        assert!(
+            body.contains("Anonym"),
+            "empty name did not render as Anonym"
+        );
+        assert!(body.contains("Ohne Namen"), "message not in body");
+
+        let _ = std::fs::remove_file(&gb_path);
+    }
+
+    /// SPEC D9 — a failed persist is logged, not fatal, and the entry stays
+    /// visible for the rest of the process lifetime.
+    ///
+    /// The failure is provoked by pointing `guestbook_path` at a directory:
+    /// `create_dir_all` on its parent succeeds, then `fs::write` fails with
+    /// `EISDIR`.  The handler must still redirect to the success page and the
+    /// in-memory vector must still hold the entry.
+    #[tokio::test]
+    async fn guestbook_survives_a_failing_save() {
+        let dir_as_path = std::env::temp_dir().join(format!(
+            "fb_gb_dir_{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir_as_path).unwrap();
+
+        // Writing to a directory path must fail, or the test proves nothing.
+        assert!(
+            guestbook::save(&dir_as_path, &[]).is_err(),
+            "expected saving to a directory path to fail"
+        );
+
+        let app = test_app_full(
+            "http://127.0.0.1:1/weather",
+            "http://127.0.0.1:1/rss",
+            dir_as_path.clone(),
+        );
+
+        let post_resp = app
+            .clone()
+            .oneshot(post_form(
+                "/666/send",
+                "name=Trotzdem&message=Bleibt+da&captcha=B",
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            post_resp.status(),
+            StatusCode::SEE_OTHER,
+            "a save failure must not fail the request"
+        );
+        assert_eq!(
+            post_resp
+                .headers()
+                .get("location")
+                .and_then(|v| v.to_str().ok()),
+            Some("/666?success=1"),
+        );
+
+        let body = body_string(
+            app.oneshot(Request::get("/666").body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .into_body(),
+        )
+        .await;
+        assert!(
+            body.contains("Bleibt da"),
+            "entry lost after a failed persist"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir_as_path);
     }
 
     // ── Regression guards (ACCEPTANCE.md Layer D) ──────────────────────────
