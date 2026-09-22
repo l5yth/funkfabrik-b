@@ -11,6 +11,9 @@ Cargo.lock
 # Runtime data
 /data/
 
+# Coverage output (`cargo llvm-cov --lcov --output-path lcov.info`, as CI runs)
+/lcov.info
+
 # Editor / OS
 .DS_Store
 .idea/
