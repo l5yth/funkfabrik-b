@@ -36,6 +36,11 @@ pub fn save(path: &Path, entries: &[GuestEntry]) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
+    // The `map_err` arm is unreachable for `GuestEntry`, which is two
+    // `String`s and a `u64`: serde_json only fails on non-string map keys or
+    // a `Serialize` impl that errors, and neither exists here.  It stays
+    // because the signature needs it, and it is the one line in this crate
+    // that coverage cannot reach (`ACCEPTANCE.md` G4).
     let json = serde_json::to_string_pretty(entries).map_err(std::io::Error::other)?;
     std::fs::write(path, json)
 }
