@@ -23,6 +23,13 @@
 //! [`guestbook_web`] serves the guestbook, [`routes`] assembles the router,
 //! and [`state`] holds the shared [`state::AppState`].
 
+// `missing_docs` only covers items public from the crate root, and this is a
+// binary whose items are all `pub(crate)` or private, so on its own it would
+// lint nothing.  It stays for the day something does become `pub`; the lint
+// that actually enforces the 100 % doc standard here is the clippy one below.
+#![deny(missing_docs)]
+#![deny(clippy::missing_docs_in_private_items)]
+
 mod guestbook;
 mod guestbook_web;
 mod pages;

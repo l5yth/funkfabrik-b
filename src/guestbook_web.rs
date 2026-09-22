@@ -32,8 +32,13 @@ use tera::Context;
 /// Form data submitted to `POST /666/send`.
 #[derive(Deserialize)]
 pub(crate) struct GuestbookForm {
+    /// Visitor-supplied display name.  Optional; an empty value renders as
+    /// "Anonym" (`SPEC.md` D9).
     pub(crate) name: String,
+    /// Body of the entry.  Rejected when empty or when it contains `://`
+    /// (`SPEC.md` D10).
     pub(crate) message: String,
+    /// Captcha answer.  Must be `b`, case-insensitive (`SPEC.md` D10).
     pub(crate) captcha: String,
 }
 
