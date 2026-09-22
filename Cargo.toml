@@ -3,13 +3,13 @@
 
 [package]
 name = "funkfabrik-b"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
-tera = "2"
+tera = { version = "2", features = ["glob_fs"] }
 tower-http = { version = "0.7", features = ["fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

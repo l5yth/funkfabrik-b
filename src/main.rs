@@ -95,10 +95,31 @@ struct AppState {
 /// How long (in seconds) a cached wttr.in response is considered fresh.
 const WEATHER_CACHE_TTL_SECS: u64 = 3600;
 
+/// Builds the Tera engine from a glob pattern.
+///
+/// Tera 2 split construction from loading: [`Tera::new`] takes no arguments
+/// and cannot fail, and templates are pulled in afterwards by
+/// [`Tera::load_from_glob`], which requires the `glob_fs` feature.  Both the
+/// server and the test harness go through this function so the engine is
+/// only ever built one way.
+///
+/// # Panics
+///
+/// Panics if the glob matches nothing parseable, or if any matched template
+/// fails to parse.  A server with no templates has nothing to serve, so
+/// failing at startup is preferable to serving the fallback error string on
+/// every route.
+fn build_tera(pattern: &str) -> Tera {
+    let mut tera = Tera::new();
+    tera.load_from_glob(pattern)
+        .expect("failed to parse templates");
+    tera
+}
+
 /// Entry point.  Compiles templates, builds the router, and starts the server.
 #[tokio::main]
 async fn main() {
-    let tera = Tera::new("templates/**/*.html").expect("failed to parse templates");
+    let tera = build_tera("templates/**/*.html");
     let guestbook_path = std::path::PathBuf::from("data/guestbook.json");
     let guestbook_entries = guestbook::load(&guestbook_path);
     let state = AppState {
@@ -510,7 +531,7 @@ mod tests {
     fn test_app_full(weather_url: &str, rss_url: &str, gb_path: std::path::PathBuf) -> Router {
         let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let pattern = format!("{}/templates/**/*.html", manifest);
-        let tera = Tera::new(&pattern).expect("failed to parse templates");
+        let tera = build_tera(&pattern);
         let entries = guestbook::load(&gb_path);
         build_router(AppState {
             tera: Arc::new(tera),
@@ -1053,6 +1074,94 @@ mod tests {
         let body = body_string(get_resp.into_body()).await;
         assert!(body.contains("TestUser"), "name not in body");
         assert!(body.contains("Hallo Welt"), "message not in body");
+
+        let _ = std::fs::remove_file(&gb_path);
+    }
+
+    // ── Regression guards (ACCEPTANCE.md Layer D) ──────────────────────────
+
+    /// ACCEPTANCE R2 — the engine must actually hold every template.
+    ///
+    /// Tera 2's `Tera::new()` cannot fail, so forgetting `load_from_glob`
+    /// would no longer blow up at startup: every route would silently fall
+    /// back to the inline `PAGE NOT FOUND` string.  This asserts the glob
+    /// really loaded, by name, for every template the router can reach.
+    #[test]
+    fn tera_engine_loads_every_template() {
+        let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let tera = build_tera(&format!("{}/templates/**/*.html", manifest));
+
+        let mut expected: Vec<String> = vec!["base.html".to_string(), "not_found.html".to_string()];
+        expected.extend(PAGES.iter().map(|(num, _, _)| format!("{}.html", num)));
+        expected.extend(
+            ["tetris", "invaders", "snake"]
+                .iter()
+                .map(|g| format!("777_{}.html", g)),
+        );
+
+        for name in &expected {
+            assert!(
+                tera.get_template_names().any(|n| n == name),
+                "template `{}` missing from the Tera engine",
+                name
+            );
+        }
+    }
+
+    /// ACCEPTANCE R3 — guestbook input stays autoescaped across a Tera major.
+    ///
+    /// Escaping is the only thing between a guestbook post and stored XSS,
+    /// and Tera 2 changed its escape set, so the behaviour is pinned here
+    /// rather than inferred from release notes.
+    #[tokio::test]
+    async fn guestbook_escapes_html_in_entries() {
+        let gb_path = temp_guestbook_path();
+        let app = test_app_full(
+            "http://127.0.0.1:1/weather",
+            "http://127.0.0.1:1/rss",
+            gb_path.clone(),
+        );
+
+        // `<script>alert("x&y's")</script>` — every metacharacter, no `://`
+        // so the URL filter in `guestbook_post` does not reject it.
+        let form = concat!(
+            "name=%3Cb%3EEvil%3C%2Fb%3E",
+            "&message=%3Cscript%3Ealert%28%22x%26y%27s%22%29%3C%2Fscript%3E",
+            "&captcha=B",
+        );
+        let post_resp = app
+            .clone()
+            .oneshot(post_form("/666/send", form))
+            .await
+            .unwrap();
+        assert_eq!(post_resp.status(), StatusCode::SEE_OTHER);
+
+        let get_resp = app
+            .oneshot(Request::get("/666").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let body = body_string(get_resp.into_body()).await;
+
+        // Payload-specific: `base.html` legitimately carries a
+        // `<script src=...>` tag, so match the injected call, not the tag.
+        assert!(
+            !body.contains("<script>alert("),
+            "raw <script> from user input reached the page"
+        );
+        assert!(
+            !body.contains("<b>Evil</b>"),
+            "raw markup from the name field reached the page"
+        );
+        assert!(body.contains("&lt;script&gt;"), "`<` / `>` not escaped");
+        assert!(body.contains("&amp;"), "`&` not escaped");
+        assert!(
+            body.contains("&quot;") || body.contains("&#34;"),
+            "`\"` not escaped"
+        );
+        assert!(
+            body.contains("&#39;") || body.contains("&#x27;"),
+            "`'` not escaped"
+        );
 
         let _ = std::fs::remove_file(&gb_path);
     }
