@@ -105,14 +105,22 @@ const WEATHER_CACHE_TTL_SECS: u64 = 3600;
 ///
 /// # Panics
 ///
-/// Panics if the glob matches nothing parseable, or if any matched template
-/// fails to parse.  A server with no templates has nothing to serve, so
-/// failing at startup is preferable to serving the fallback error string on
-/// every route.
+/// Panics if a matched template fails to parse, and if the glob matched no
+/// templates at all.
+///
+/// The empty case has to be checked explicitly: Tera treats a glob that
+/// matches nothing as success and hands back an empty engine, so a mistyped
+/// pattern or a wrong working directory would otherwise start cleanly and
+/// serve the inline fallback string with HTTP 200 on every route.  Failing at
+/// startup surfaces that immediately.
 fn build_tera(pattern: &str) -> Tera {
     let mut tera = Tera::new();
     tera.load_from_glob(pattern)
         .expect("failed to parse templates");
+    assert!(
+        tera.get_template_names().next().is_some(),
+        "no templates matched `{pattern}` (run the server from the project root)"
+    );
     tera
 }
 
@@ -1079,6 +1087,48 @@ mod tests {
     }
 
     // ── Regression guards (ACCEPTANCE.md Layer D) ──────────────────────────
+
+    /// ACCEPTANCE R2 — a glob that matches nothing is fatal, not silent.
+    ///
+    /// Tera's `load_from_glob` returns `Ok(())` for a glob matching no files,
+    /// so without the explicit check in [`build_tera`] a mistyped pattern
+    /// would serve `PAGE NOT FOUND` with HTTP 200 on every route instead of
+    /// failing at startup.
+    #[test]
+    #[should_panic(expected = "no templates matched")]
+    fn build_tera_panics_when_glob_matches_nothing() {
+        // Fixed name, not a unique one: the panic unwinds past any cleanup,
+        // so a unique path per run would litter the temp directory.
+        let empty = std::env::temp_dir().join("fb_empty_templates");
+        std::fs::create_dir_all(&empty).unwrap();
+        build_tera(&format!("{}/**/*.html", empty.display()));
+    }
+
+    /// ACCEPTANCE R2 — the pattern `main` itself passes must be the one that
+    /// resolves the templates, relative to the project root.
+    ///
+    /// `tera_engine_loads_every_template` builds from an absolute
+    /// `CARGO_MANIFEST_DIR` path, so on its own it would not catch a typo in
+    /// the literal `main` uses.  This runs that exact literal.
+    #[test]
+    fn build_tera_accepts_the_literal_pattern_main_uses() {
+        // Cargo runs test binaries with the working directory set to the
+        // package root, which is the same place the server is run from, so
+        // the literal resolves here exactly as it does in `main`.  Asserted
+        // rather than forced: `set_current_dir` is process-global and would
+        // race the other tests in this module.
+        assert_eq!(
+            std::env::current_dir().unwrap(),
+            std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap()),
+            "test harness cwd is not the package root"
+        );
+
+        let tera = build_tera("templates/**/*.html");
+        assert!(
+            tera.get_template_names().any(|n| n == "base.html"),
+            "main's own glob literal resolved nothing from the project root"
+        );
+    }
 
     /// ACCEPTANCE R2 — the engine must actually hold every template.
     ///
